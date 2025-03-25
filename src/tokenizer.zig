@@ -15,24 +15,47 @@ pub const Tokenizer = struct {
     length: usize,
     index: u32,
 
+    pub const TokenizerError = error{ InvalidIdentifier, InvalidOperator, EOF };
+
     pub fn init(source: []const u8, length: usize) Tokenizer {
         return Tokenizer{ .source = source, .length = length, .index = 0 };
     }
 
-    fn skipWhitespace(self: *Tokenizer) void {
+    fn skipWhitespace(self: *Tokenizer) ?Token {
         while (!isEOF(self) and ascii.isWhitespace(self.source[self.index])) {
+            if (self.source[self.index] == '\n') {
+                self.index += 1;
+                return Token{ .id = .new_line, .start = self.index - 1, .end = self.index };
+            }
+
             self.index += 1;
         }
+
+        return null;
     }
 
     fn isEOF(self: *Tokenizer) bool {
         return self.index >= self.length;
     }
 
-    pub fn next(self: *Tokenizer) ?Token {
-        self.skipWhitespace();
-
+    fn peek(self: *Tokenizer) ?u8 {
         if (self.isEOF()) return null;
+        return self.index[self.length];
+    }
+
+    fn pop(self: *Tokenizer) ?u8 {
+        if (self.peek()) |val| {
+            self.index += 1;
+
+            return val;
+        }
+        return null;
+    }
+
+    pub fn next(self: *Tokenizer) !Token {
+        if (self.skipWhitespace()) |val| return val;
+
+        if (self.isEOF()) return TokenizerError.EOF;
 
         var token = Token{ .id = .illegal, .start = self.index, .end = self.index };
         const startChar = self.source[self.index];
@@ -81,8 +104,8 @@ pub const Tokenizer = struct {
                     token.id = .eq_eq;
                     self.index += 1;
                     token.end = self.index;
-                    
-                    return 
+
+                    return token;
                 }
 
                 token.id = .eq;
@@ -91,7 +114,7 @@ pub const Tokenizer = struct {
 
                 return token;
             },
-            else => return null,
+            else => return TokenizerError.InvalidOperator,
         }
     }
 };
