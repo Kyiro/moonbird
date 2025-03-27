@@ -2,6 +2,7 @@ const std = @import("std");
 const Token = @import("token.zig").Token;
 
 const ascii = std.ascii;
+const mem = std.mem;
 
 fn isValidIdentifierChar(char: u8) bool {
     return switch (char) {
@@ -13,7 +14,7 @@ fn isValidIdentifierChar(char: u8) bool {
 pub const Tokenizer = struct {
     source: []const u8,
     length: usize,
-    index: u32,
+    index: usize,
 
     pub const TokenizerError = error{ InvalidIdentifier, InvalidOperator, EOF };
 
@@ -36,6 +37,10 @@ pub const Tokenizer = struct {
 
     fn isEOF(self: *Tokenizer) bool {
         return self.index >= self.length;
+    }
+
+    fn isIndexEOF(self: *Tokenizer, index: usize) bool {
+        return index >= self.length;
     }
 
     fn peek(self: *Tokenizer) ?u8 {
@@ -91,30 +96,20 @@ pub const Tokenizer = struct {
             return token;
         }
 
-        switch (self.source[self.index]) {
-            '+' => {
-                token.id = .plus;
-                self.index += 1;
-                token.end = self.index;
+        self.index += 1;
 
-                return token;
-            },
-            '=' => {
-                if (!self.isEOF() and self.source[self.index + 1] == '=') {
-                    token.id = .eq_eq;
-                    self.index += 1;
-                    token.end = self.index;
+        for (Token.operatorKeys) |key| {
+            if (self.isIndexEOF(self.index + key.len)) continue;
+            if (!mem.eql(u8, key, self.source[self.index .. self.index + key.len])) continue;
 
-                    return token;
-                }
+            if (Token.operators.get(key)) |id| {
+                token.id = id;
+                token.end = self.index + key.len;
 
-                token.id = .eq;
-                self.index += 1;
-                token.end = self.index;
-
-                return token;
-            },
-            else => return TokenizerError.InvalidOperator,
+                break;
+            }
         }
+
+        return token;
     }
 };

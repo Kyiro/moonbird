@@ -1,8 +1,10 @@
 const std = @import("std");
 
+const mem = std.mem;
+
 pub const Token = struct {
-    start: u32,
-    end: u32,
+    start: usize,
+    end: usize,
     id: Id,
 
     pub const Id = enum(u8) {
@@ -29,8 +31,13 @@ pub const Token = struct {
         gt, // '>' (greater than)
         gt_eq, // '>=' (greater than, equal)
         plus, // '+' (addition)
+        plus_eq, // '+='
+        minus, // '-' (subtraction)
+        minus_eq, // '-='
         slash, // '/' (division)
+        slash_eq, // '/='
         asterisk, // '*' (multiplication)
+        asterisk_eq, // '*='
 
         identifier, // Variables names like 'x'
         l_paren, // '('
@@ -67,16 +74,17 @@ pub const Token = struct {
         .{ "true", .true_keyword },
     });
 
-    pub const operators = std.StaticStringMap(Id).initComptime(.{
+    pub const operators = std.StaticStringMap(Id).initComptime(&.{
         // inshallah, you will not format
-        .{ "=", .eq },
         .{ "!=", .not_eq },
         .{ "==", .eq_eq },
-        .{ "<", .lt },
+        .{ "=", .eq },
         .{ "<=", .lt_eq },
-        .{ ">", .gt },
+        .{ "<", .lt },
         .{ ">=", .gt_eq },
+        .{ ">", .gt },
         .{ "+", .plus },
+        .{ "+=", .plus_eq },
         .{ "/", .slash },
         .{ "*", .asterisk },
         .{ "(", .l_paren },
@@ -89,4 +97,27 @@ pub const Token = struct {
         .{ ".", .dot },
         .{ ":", .colon },
     });
+
+    pub const operatorKeys = [_][]const u8{
+        "!=", // 2-char operators
+        "==",
+        "<=",
+        ">=",
+        "+=",
+        "(", // 1-char operators
+        ")",
+        "[",
+        "]",
+        "{",
+        "}",
+        ",",
+        ".",
+        ":",
+        "<",
+        ">",
+        "=",
+        "+",
+        "/",
+        "*",
+    };
 };

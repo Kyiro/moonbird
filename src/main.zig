@@ -3,11 +3,12 @@ const lib = @import("moonbird");
 
 pub fn main() !void {
     const variable_example =
-        \\local x = 2 + 2
-        \\
-        \\if x == 4 then
-        \\    print("x is 4")
-        \\end
+        // \\local x = 2 + 2
+        // \\
+        // \\if x == 4 then
+        // \\    print("x is 4")
+        // \\end
+        \\2+2
     ;
 
     std.debug.print("{s}\n", .{variable_example});
