@@ -52,8 +52,9 @@ pub const Token = struct {
 
         string_literal, // e.g. "Hello, World"
         multi_string_literal, // e.g. [[Hello, World!]]
-        int_literal, // integer literal
+        num_literal, // number literal
         new_line,
+        comment,
         illegal,
     };
 
@@ -85,8 +86,12 @@ pub const Token = struct {
         .{ ">", .gt },
         .{ "+", .plus },
         .{ "+=", .plus_eq },
+        .{ "-", .minus },
+        .{ "-=", .minus_eq },
         .{ "/", .slash },
+        .{ "/=", .slash_eq },
         .{ "*", .asterisk },
+        .{ "*=", .asterisk_eq },
         .{ "(", .l_paren },
         .{ ")", .r_paren },
         .{ "[", .l_brace },
@@ -104,6 +109,9 @@ pub const Token = struct {
         "<=",
         ">=",
         "+=",
+        "-=",
+        "*=",
+        "/=",
         "(", // 1-char operators
         ")",
         "[",
