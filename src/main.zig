@@ -3,7 +3,7 @@ const lib = @import("moonbird");
 
 pub fn main() !void {
     const variable_example =
-        \\local x = 2+2 -- adds 2 and 2
+        \\local x = 2 + 2 -- adds 2 and 2
         \\
         \\if x == 4 then
         \\    print("x is 4") -- x is 4 indeed

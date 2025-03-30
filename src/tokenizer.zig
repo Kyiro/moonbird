@@ -37,10 +37,6 @@ pub const Tokenizer = struct {
         return null;
     }
 
-    fn isEOF(self: *Tokenizer) bool {
-        return self.index >= self.length;
-    }
-
     fn peekAhead(self: *Tokenizer, offset: usize) ?u8 {
         if (self.index + offset >= self.source.len) return null;
         return self.source[self.index + offset];
@@ -52,7 +48,7 @@ pub const Tokenizer = struct {
     }
 
     fn peek(self: *Tokenizer) ?u8 {
-        if (self.isEOF()) return null;
+        if (self.index >= self.length) return null;
         return self.source[self.index];
     }
 
@@ -112,6 +108,8 @@ pub const Tokenizer = struct {
 
     pub fn parseComment(self: *Tokenizer) !Token {
         const start = self.index;
+
+        self.index += 2; // we can skip the '--' characters
 
         while (self.peek() != '\n') {
             self.index += 1;
