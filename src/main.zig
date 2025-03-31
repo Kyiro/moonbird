@@ -17,7 +17,7 @@ pub fn main() !void {
     var val = try lib.Tokenizer.next(&tokenizer);
 
     while (true) {
-        std.debug.print("-- {s} - {s}\n", .{ @tagName(val.id), variable_example[val.start..val.end] });
+        std.debug.print("-- {s} - {s}\n", .{ @tagName(val.id), val.toString(variable_example) });
 
         val = lib.Tokenizer.next(&tokenizer) catch |err| {
             std.debug.print("-- ERROR: {s}\n", .{@errorName(err)});

@@ -128,4 +128,8 @@ pub const Token = struct {
         "/",
         "*",
     };
+
+    pub fn toString(self: *Token, source: []const u8) []const u8 {
+        return source[self.start..self.end];
+    }
 };
