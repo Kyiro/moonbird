@@ -76,7 +76,6 @@ pub const Token = struct {
     });
 
     pub const operators = std.StaticStringMap(Id).initComptime(&.{
-        // inshallah, you will not format
         .{ "!=", .not_eq },
         .{ "==", .eq_eq },
         .{ "=", .eq },
@@ -128,8 +127,4 @@ pub const Token = struct {
         "/",
         "*",
     };
-
-    pub fn toString(self: *Token, source: []const u8) []const u8 {
-        return source[self.start..self.end];
-    }
 };

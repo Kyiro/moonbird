@@ -57,7 +57,7 @@ pub const Tokenizer = struct {
         return self.peekBehind(1);
     }
 
-    pub fn parseNumberLiteral(self: *Tokenizer) !Token {
+    fn parseNumberLiteral(self: *Tokenizer) !Token {
         const start = self.index;
 
         while (self.peek()) |char| {
@@ -69,7 +69,7 @@ pub const Tokenizer = struct {
         return Token{ .id = .num_literal, .start = start, .end = self.index };
     }
 
-    pub fn parseIdentifierOrKeyword(self: *Tokenizer) !Token {
+    fn parseIdentifierOrKeyword(self: *Tokenizer) !Token {
         const start = self.index;
 
         while (self.peek()) |char| {
@@ -89,7 +89,7 @@ pub const Tokenizer = struct {
         return token;
     }
 
-    pub fn parseStringLiteral(self: *Tokenizer) !Token {
+    fn parseStringLiteral(self: *Tokenizer) !Token {
         const start = self.index;
 
         self.index += 1;
@@ -106,7 +106,7 @@ pub const Tokenizer = struct {
         return Token{ .id = .string_literal, .start = start, .end = self.index };
     }
 
-    pub fn parseComment(self: *Tokenizer) !Token {
+    fn parseComment(self: *Tokenizer) !Token {
         const start = self.index;
 
         self.index += 2; // we can skip the '--' characters
@@ -118,7 +118,7 @@ pub const Tokenizer = struct {
         return Token{ .id = .comment, .start = start, .end = self.index };
     }
 
-    pub fn next(self: *Tokenizer) !Token {
+    pub fn nextToken(self: *Tokenizer) !Token {
         if (self.skipWhitespace()) |val| return val;
 
         const startChar = self.peek() orelse return TokenizerError.EOF;
@@ -160,5 +160,9 @@ pub const Tokenizer = struct {
         self.index += 1;
 
         return Token{ .id = .illegal, .start = self.index - 1, .end = self.index };
+    }
+
+    pub fn readToString(self: *Tokenizer, token: *Token) []const u8 {
+        return self.source[token.start..token.end];
     }
 };

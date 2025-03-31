@@ -14,15 +14,13 @@ pub fn main() !void {
 
     var tokenizer = lib.Tokenizer.init(variable_example, variable_example.len);
 
-    var val = try lib.Tokenizer.next(&tokenizer);
-
     while (true) {
-        std.debug.print("-- {s} - {s}\n", .{ @tagName(val.id), val.toString(variable_example) });
-
-        val = lib.Tokenizer.next(&tokenizer) catch |err| {
+        const val = lib.Tokenizer.nextToken(&tokenizer) catch |err| {
             std.debug.print("-- ERROR: {s}\n", .{@errorName(err)});
 
             break;
         };
+
+        std.debug.print("-- {s} - {s}\n", .{ @tagName(val.id), tokenizer.readToString(&val) });
     }
 }
