@@ -7,6 +7,12 @@ pub const Token = struct {
     end: usize,
     id: Id,
 
+    pub fn expect(self: *const Token, id: Id) !void {
+        if (self.id == id) return;
+
+        return error{UnexpectedToken}.UnexpectedToken;
+    }
+
     pub const Id = enum(u8) {
         local_keyword,
         break_keyword,

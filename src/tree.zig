@@ -57,6 +57,14 @@ pub fn NodeOf(comptime T: type) type {
         start: usize,
         end: usize,
         content: T,
+
+        pub fn init(token: *const Token, content: T) NodeOf(T) {
+            return .{
+                .start = token.start,
+                .end = token.end,
+                .content = content,
+            };
+        }
     };
 }
 
@@ -85,21 +93,33 @@ pub const AssignmentExpression = struct {
 
 pub const Expression = union(ExpressionKind) {
     array: ArrayExpression,
+    assignment: AssignmentExpression,
+    binary: struct {},
+    call: struct {},
+    identifier: struct {},
+    member: struct {},
+    method: struct {},
+    numeric: struct {},
+    require: struct {},
+    string: struct {},
 };
 
 pub const ParseError = error{};
 
 pub const Tree = struct {
     arena: heap.ArenaAllocator,
+    allocator: std.mem.Allocator,
     nodes: std.ArrayList(Node),
     tokenizer: *Tokenizer,
 
-    pub fn init(allocator: *heap.Allocator, tokenizer: *Tokenizer) Tree {
-        const arena = heap.ArenaAllocator.init(allocator);
+    pub fn init(allocator: std.mem.Allocator, tokenizer: *Tokenizer) Tree {
+        var arena = heap.ArenaAllocator.init(allocator);
+        const arenaAlloc = arena.allocator();
 
         return Tree{
             .arena = arena,
-            .nodes = std.ArrayList(Node).init(arena.allocator()),
+            .allocator = arenaAlloc,
+            .nodes = std.ArrayList(Node).init(arenaAlloc),
             .tokenizer = tokenizer,
         };
     }
@@ -108,19 +128,42 @@ pub const Tree = struct {
         self.arena.deinit();
     }
 
-    // pub fn processVariableDeclaration(self: *Tree) !Node {
+    pub fn processVariableDeclaration(self: *Tree) !void {
+        const allocator = self.arena.allocator();
 
-    // }
+        var left = std.ArrayList(NodeOf(IdentifierExpression)).init(allocator);
 
-    fn process(self: *Tree) !Node {
-        const token = self.tokenizer.nextToken() catch |err| return err;
+        while (true) {
+            const token = try self.tokenizer.nextToken();
 
-        if (token.id == .local_keyword) {}
+            std.debug.print("token: {s}\n", .{@tagName(token.id)});
+
+            if (token.id == .eq) {
+                break;
+            } else if (token.id == .identifier) {
+                try left.append(NodeOf(IdentifierExpression).init(&token, .{
+                    .name = self.tokenizer.readToString(&token),
+                }));
+
+                continue;
+            }
+
+            try token.expect(.comma);
+        }
+    }
+
+    fn process(self: *Tree) !void {
+        const token = try self.tokenizer.nextToken();
+
+        if (token.id == .local_keyword)
+            return try self.processVariableDeclaration();
+
+        return Tokenizer.TokenizerError.EOF;
     }
 
     pub fn parseSource(self: *Tree) !void {
         while (true) {
-            self.process() catch |err| return err;
+            try self.process();
         }
     }
 };

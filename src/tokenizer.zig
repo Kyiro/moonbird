@@ -16,7 +16,7 @@ pub const Tokenizer = struct {
     length: usize,
     index: usize,
 
-    pub const TokenizerError = error{ InvalidIdentifier, InvalidOperator, EOF };
+    pub const TokenizerError = error{ UnexpectedToken, InvalidIdentifier, InvalidOperator, EOF };
 
     pub fn init(source: []const u8, length: usize) Tokenizer {
         return Tokenizer{ .source = source, .length = length, .index = 0 };
@@ -37,17 +37,17 @@ pub const Tokenizer = struct {
         return null;
     }
 
-    fn peekAhead(self: *Tokenizer, offset: usize) ?u8 {
+    fn peekAhead(self: *const Tokenizer, offset: usize) ?u8 {
         if (self.index + offset >= self.source.len) return null;
         return self.source[self.index + offset];
     }
 
-    fn peekBehind(self: *Tokenizer, offset: usize) ?u8 {
+    fn peekBehind(self: *const Tokenizer, offset: usize) ?u8 {
         if (self.index - offset >= self.source.len) return null;
         return self.source[self.index - offset];
     }
 
-    fn peek(self: *Tokenizer) ?u8 {
+    fn peek(self: *const Tokenizer) ?u8 {
         if (self.index >= self.length) return null;
         return self.source[self.index];
     }
@@ -118,6 +118,14 @@ pub const Tokenizer = struct {
         return Token{ .id = .comment, .start = start, .end = self.index };
     }
 
+    pub fn assertNextToken(self: *const Tokenizer, id: Token.Id) !Token {
+        const token = self.nextToken() catch |err| return err;
+
+        if (token.id == id) return token;
+
+        return TokenizerError.UnexpectedToken;
+    }
+
     pub fn nextToken(self: *Tokenizer) !Token {
         if (self.skipWhitespace()) |val| return val;
 
@@ -162,7 +170,7 @@ pub const Tokenizer = struct {
         return Token{ .id = .illegal, .start = self.index - 1, .end = self.index };
     }
 
-    pub fn readToString(self: *Tokenizer, token: *Token) []const u8 {
+    pub fn readToString(self: *const Tokenizer, token: *const Token) []const u8 {
         return self.source[token.start..token.end];
     }
 };
