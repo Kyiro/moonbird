@@ -4,6 +4,64 @@ const Token = @import("token.zig").Token;
 
 const heap = std.heap;
 
+pub const VariableDeclaration = struct {
+    pub const Declaration = struct {
+        identifier: NodeOf(IdentifierExpression),
+        value: NodeOf(ExpressionStatement),
+    };
+
+    declarations: std.ArrayList(Declaration),
+};
+
+pub const FunctionDeclaration = struct {
+    identifier: NodeOf(IdentifierExpression),
+    body: BlockStatement,
+};
+
+pub const IfStatement = struct {
+    testing: ExpressionNode,
+};
+
+pub const BlockStatement = struct {
+    body: std.ArrayList(Node),
+};
+
+pub const ExpressionStatement = struct {
+    expression: ExpressionNode,
+};
+
+pub const IdentifierExpression = struct {
+    name: []const u8,
+};
+
+pub const NodeKind = enum(u8) {
+    variable_declaration,
+    function_declaration,
+    if_statement,
+    block_statement,
+    expression_statement,
+};
+
+pub const NodeContent = union(NodeKind) {
+    variable_declaration: VariableDeclaration,
+    function_declaration: FunctionDeclaration,
+    if_statement: IfStatement,
+    block_statement: BlockStatement,
+    expression_statement: ExpressionStatement,
+};
+
+pub const Node = NodeOf(NodeContent);
+
+pub fn NodeOf(comptime T: type) type {
+    return struct {
+        start: usize,
+        end: usize,
+        content: T,
+    };
+}
+
+pub const ExpressionNode = NodeOf(Expression);
+
 pub const ExpressionKind = enum(u8) {
     array,
     assignment,
@@ -17,45 +75,16 @@ pub const ExpressionKind = enum(u8) {
     string,
 };
 
-pub const VariableDeclaration = struct {
-    pub const Declaration = struct {
-        identifier: IdentifierExpression,
-        value: ExpressionStatement,
-    };
-
-    declarations: std.ArrayList(Declaration),
+pub const ArrayExpression = struct {
+    body: std.ArrayList(Expression),
 };
 
-pub const FunctionDeclaration = struct {};
+pub const AssignmentExpression = struct {
+    // left:
+};
 
-pub const IfStatement = struct {};
-
-pub const BlockStatement = struct {};
-
-pub const ExpressionStatement = struct {};
-
-pub const IdentifierExpression = struct {};
-
-pub const Node = struct {
-    pub const Kind = enum(u8) {
-        variable_declaration,
-        function_declaration,
-        if_statement,
-        block_statement,
-        expression_statement,
-    };
-
-    pub const Content = union(Kind) {
-        variable_declaration: VariableDeclaration,
-        function_declaration: FunctionDeclaration,
-        if_statement: IfStatement,
-        block_statement: BlockStatement,
-        expression_statement: ExpressionStatement,
-    };
-
-    content: Content,
-    start: usize,
-    end: usize,
+pub const Expression = union(ExpressionKind) {
+    array: ArrayExpression,
 };
 
 pub const ParseError = error{};
@@ -78,6 +107,10 @@ pub const Tree = struct {
     pub fn deinit(self: *Tree) void {
         self.arena.deinit();
     }
+
+    // pub fn processVariableDeclaration(self: *Tree) !Node {
+
+    // }
 
     fn process(self: *Tree) !Node {
         const token = self.tokenizer.nextToken() catch |err| return err;
