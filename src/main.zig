@@ -8,13 +8,17 @@ pub fn main() !void {
         // \\if x == 4 then
         // \\    print("x is 4") -- x is 4 indeed
         // \\end
-        \\local x =
+        \\local x = 240
+        \\
     ;
 
     std.debug.print("{s}\n", .{variable_example});
 
     var tokenizer = lib.Tokenizer.init(variable_example, variable_example.len);
     var tree = lib.Tree.init(std.heap.page_allocator, &tokenizer);
+    defer tree.deinit();
 
     tree.parseSource() catch |err| std.debug.print("Error: {s}\n", .{@errorName(err)});
+
+    try lib.pretty.print(std.heap.page_allocator, tree.nodes, .{});
 }
