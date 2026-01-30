@@ -1,176 +1,116 @@
+// reference
+// https://codeberg.org/ziglang/zig/src/branch/main/lib/std/zig/tokenizer.zig
 const std = @import("std");
-const Token = @import("token.zig").Token;
 
-const ascii = std.ascii;
-const mem = std.mem;
+pub const Token = struct {
+    tag: Tag,
+    loc: Loc,
 
-fn isValidIdentifierChar(char: u8) bool {
-    return switch (char) {
-        'A'...'Z', 'a'...'z', '0'...'9', '$', '_' => true,
-        else => false,
+    pub const Loc = struct {
+        start: usize,
+        end: usize,
     };
-}
+
+    pub const keywords = std.StaticStringMap(Tag).initComptime(.{
+        .{ "local", Tag.keyword_local },
+        .{ "break", Tag.keyword_break },
+        .{ "continue", Tag.keyword_continue },
+        .{ "else", Tag.keyword_else },
+        .{ "if", Tag.keyword_if },
+        .{ "or", Tag.keyword_or },
+        .{ "and", Tag.keyword_and },
+        .{ "then", Tag.keyword_then },
+        .{ "end", Tag.keyword_end },
+        .{ "return", Tag.keyword_return },
+        .{ "false", Tag.keyword_false },
+        .{ "true", Tag.keyword_true },
+        .{ "null", Tag.keyword_null },
+    });
+
+    pub const Tag = enum(u8) {
+        keyword_local,
+        keyword_break,
+        keyword_continue,
+        keyword_else,
+        keyword_if,
+        keyword_or,
+        keyword_and,
+        keyword_then,
+        keyword_end,
+        keyword_return,
+        keyword_false,
+        keyword_true,
+        keyword_null,
+
+        eq, // '=' (assignment)
+        not_eq, // '!=' (not equal)
+        eq_eq, // '==' (comparison)
+        lt, // '<' (less than)
+        lt_eq, // '<=' (less than, equal)
+        gt, // '>' (greater than)
+        gt_eq, // '>=' (greater than, equal)
+        plus, // '+' (addition)
+        plus_plus, // '++' (array concat)
+        plus_eq, // '+='
+        minus, // '-' (subtraction)
+        minus_eq, // '-='
+        slash, // '/' (division)
+        slash_eq, // '/='
+        asterisk, // '*' (multiplication)
+        asterisk_eq, // '*='
+
+        identifier, // Variables names like 'x'
+        l_paren, // '('
+        r_paren, // ')'
+        l_brace, // '{'
+        r_brace, // '}'
+        comma, // ','
+        dot, // '.'
+
+        string_literal, // e.g. "Hello, World"
+        multi_string_literal, // e.g. [[Hello, World!]]
+        num_literal, // number literal
+        regex_literal, // regex literal (e.g. /^dog/i)
+        new_line,
+        comment, // '--' (e.g. '-- This is a comment')
+        illegal,
+    };
+};
 
 pub const Tokenizer = struct {
-    source: []const u8,
-    length: usize,
+    buffer: [:0]const u8,
     index: usize,
 
-    pub const TokenizerError = error{ UnexpectedToken, InvalidIdentifier, InvalidOperator, EOF };
+    pub const TokenizerError = error{EOF};
 
-    pub fn init(source: []const u8, length: usize) Tokenizer {
-        return Tokenizer{ .source = source, .length = length, .index = 0 };
+    pub fn init(buffer: [:0]const u8) Tokenizer {
+        return .{
+            .buffer = buffer,
+            // Skip the UTF-8 BOM if present.
+            .index = if (std.mem.startsWith(u8, buffer, "\xEF\xBB\xBF")) 3 else 0,
+        };
     }
 
-    fn skipWhitespace(self: *Tokenizer) ?Token {
-        while (self.peek()) |char| {
-            if (!ascii.isWhitespace(char)) break;
+    const State = enum {
+        start,
+    };
 
-            if (char == '\n') {
-                self.index += 1;
-                return Token{ .id = .new_line, .start = self.index - 1, .end = self.index };
-            }
+    pub fn next(self: *Tokenizer) TokenizerError!Token {
+        var result: Token = .{
+            .tag = undefined,
+            .loc = .{
+                .start = self.index,
+                .end = undefined,
+            },
+        };
 
-            self.index += 1;
+        state: switch (State.start) {
+            0 => {
+                continue :state .start;
+            },
         }
 
-        return null;
-    }
-
-    fn peekAhead(self: *const Tokenizer, offset: usize) ?u8 {
-        if (self.index + offset >= self.source.len) return null;
-        return self.source[self.index + offset];
-    }
-
-    fn peekBehind(self: *const Tokenizer, offset: usize) ?u8 {
-        if (self.index - offset >= self.source.len) return null;
-        return self.source[self.index - offset];
-    }
-
-    fn peek(self: *const Tokenizer) ?u8 {
-        if (self.index >= self.length) return null;
-        return self.source[self.index];
-    }
-
-    fn pop(self: *Tokenizer) ?u8 {
-        self.index += 1;
-        return self.peekBehind(1);
-    }
-
-    fn parseNumberLiteral(self: *Tokenizer) !Token {
-        const start = self.index;
-
-        while (self.peek()) |char| {
-            if (!ascii.isDigit(char)) break;
-
-            self.index += 1;
-        }
-
-        return Token{ .id = .num_literal, .start = start, .end = self.index };
-    }
-
-    fn parseIdentifierOrKeyword(self: *Tokenizer) !Token {
-        const start = self.index;
-
-        while (self.peek()) |char| {
-            if (!isValidIdentifierChar(char)) break;
-
-            self.index += 1;
-        }
-
-        var token = Token{ .id = .identifier, .start = start, .end = self.index };
-
-        const identifier = self.source[token.start..token.end];
-
-        if (Token.keywords.get(identifier)) |keyword| {
-            token.id = keyword;
-        }
-
-        return token;
-    }
-
-    fn parseStringLiteral(self: *Tokenizer) !Token {
-        const start = self.index;
-
-        self.index += 1;
-        var isEscaped = false;
-
-        while (self.pop()) |char| {
-            if (!isEscaped and char == '"') break;
-
-            if (char == '\\') {
-                isEscaped = true;
-            }
-        }
-
-        return Token{ .id = .string_literal, .start = start, .end = self.index };
-    }
-
-    fn parseComment(self: *Tokenizer) !Token {
-        const start = self.index;
-
-        self.index += 2; // we can skip the '--' characters
-
-        while (self.peek() != '\n') {
-            self.index += 1;
-        }
-
-        return Token{ .id = .comment, .start = start, .end = self.index };
-    }
-
-    pub fn assertNextToken(self: *const Tokenizer, id: Token.Id) !Token {
-        const token = self.nextToken() catch |err| return err;
-
-        if (token.id == id) return token;
-
-        return TokenizerError.UnexpectedToken;
-    }
-
-    pub fn nextToken(self: *Tokenizer) !Token {
-        if (self.skipWhitespace()) |val| return val;
-
-        const startChar = self.peek() orelse return TokenizerError.EOF;
-
-        if (ascii.isDigit(startChar))
-            return self.parseNumberLiteral();
-
-        // we don't need to check for variables starting with numbers here
-        // as they're checked above
-        if (isValidIdentifierChar(startChar))
-            return self.parseIdentifierOrKeyword();
-
-        if (startChar == '"')
-            return self.parseStringLiteral();
-
-        if (startChar == '-' and self.peekAhead(1) == '-')
-            return self.parseComment();
-
-        for (Token.operatorKeys) |key| {
-            if (self.index + key.len > self.source.len) continue;
-
-            const operator = self.source[self.index .. self.index + key.len];
-
-            if (mem.eql(u8, operator, key)) {
-                if (Token.operators.get(key)) |id| {
-                    const token = Token{
-                        .id = id,
-                        .start = self.index,
-                        .end = self.index + key.len,
-                    };
-
-                    self.index += key.len;
-
-                    return token;
-                }
-            }
-        }
-
-        self.index += 1;
-
-        return Token{ .id = .illegal, .start = self.index - 1, .end = self.index };
-    }
-
-    pub fn readToString(self: *const Tokenizer, token: *const Token) []const u8 {
-        return self.source[token.start..token.end];
+        result.loc.end = self.index;
+        return result;
     }
 };
