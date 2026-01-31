@@ -21,6 +21,7 @@ pub const Token = struct {
         .{ "and", Tag.keyword_and },
         .{ "then", Tag.keyword_then },
         .{ "end", Tag.keyword_end },
+        .{ "not", Tag.keyword_not },
         .{ "return", Tag.keyword_return },
         .{ "false", Tag.keyword_false },
         .{ "true", Tag.keyword_true },
@@ -37,6 +38,7 @@ pub const Token = struct {
         keyword_and,
         keyword_then,
         keyword_end,
+        keyword_not,
         keyword_return,
         keyword_false,
         keyword_true,
@@ -58,6 +60,10 @@ pub const Token = struct {
         slash_eq, // '/='
         asterisk, // '*' (multiplication)
         asterisk_eq, // '*='
+        caret, // '^'
+        caret_eq, // '^='
+        percent, // '%'
+        percent_eq, // '%='
 
         identifier, // Variables names like 'x'
         l_paren, // '('
@@ -74,14 +80,13 @@ pub const Token = struct {
         new_line,
         comment, // '--' (e.g. '-- This is a comment')
         illegal,
+        eof, // end of file
     };
 };
 
 pub const Tokenizer = struct {
     buffer: [:0]const u8,
     index: usize,
-
-    pub const TokenizerError = error{EOF};
 
     pub fn init(buffer: [:0]const u8) Tokenizer {
         return .{
@@ -93,9 +98,22 @@ pub const Tokenizer = struct {
 
     const State = enum {
         start,
+        identifier,
+        int,
+        eq,
+        percent,
+        asterisk,
+        plus,
+        lt,
+        gt,
+        caret,
+        dot,
+        minus,
+        slash,
+        illegal,
     };
 
-    pub fn next(self: *Tokenizer) TokenizerError!Token {
+    pub fn next(self: *Tokenizer) Token {
         var result: Token = .{
             .tag = undefined,
             .loc = .{
@@ -105,9 +123,119 @@ pub const Tokenizer = struct {
         };
 
         state: switch (State.start) {
-            0 => {
-                continue :state .start;
+            .start => switch (self.buffer[self.index]) {
+                0 => {
+                    if (self.index == self.buffer.len) {
+                        return .{
+                            .tag = .eof,
+                            .loc = .{
+                                .start = self.index,
+                                .end = self.index,
+                            },
+                        };
+                    } else {
+                        continue :state .illegal;
+                    }
+                },
+                ' ', '\t', '\r' => {
+                    self.index += 1;
+                    result.loc.start = self.index;
+                    continue :state .start;
+                },
+                '\n' => {
+                    result.tag = .new_line;
+                    self.index += 1;
+                },
+                'a'...'z', 'A'...'Z', '_' => continue :state .identifier,
+                '(' => {
+                    result.tag = .l_paren;
+                    self.index += 1;
+                },
+                ')' => {
+                    result.tag = .r_paren;
+                    self.index += 1;
+                },
+                '{' => {
+                    result.tag = .l_brace;
+                    self.index += 1;
+                },
+                '}' => {
+                    result.tag = .r_brace;
+                    self.index += 1;
+                },
+                '=' => continue :state .eq,
+                // '%' => continue :state .percent,
+                // '*' => continue :state .asterisk,
+                // '+' => continue :state .plus,
+                // '<' => continue :state .lt,
+                // '>' => continue :state .gt,
+                // '^' => continue :state .caret,
+                // '.' => continue :state .dot,
+                // '-' => continue :state .minus,
+                // '/' => continue :state .slash,
+                // '0'...'9' => {
+                //     result.tag = .number_literal;
+                //     self.index += 1;
+                //     continue :state .int;
+                // },
+                else => continue :state .illegal,
             },
+            .identifier => {
+                self.index += 1;
+
+                switch (self.buffer[self.index]) {
+                    'a'...'z', 'A'...'Z', '_', '0'...'9' => continue :state .identifier,
+                    else => {
+                        const ident = self.buffer[result.loc.start..self.index];
+
+                        result.tag = Token.keywords.get(ident) orelse .identifier;
+                    },
+                }
+            },
+            .eq => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    '=' => {
+                        result.tag = .eq_eq;
+                        self.index += 1;
+                    },
+                    else => result.tag = .eq,
+                }
+            },
+            .plus => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    '=' => {
+                        result.tag = .plus_eq;
+                        self.index += 1;
+                    },
+                    else => result.tag = .plus,
+                }
+            },
+            .minus => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    '=' => {
+                        result.tag = .minus_eq;
+                        self.index += 1;
+                    },
+                    else => result.tag = .minus,
+                }
+            },
+            .illegal => {
+                self.index += 1;
+
+                switch (self.buffer[self.index]) {
+                    0 => if (self.index == self.buffer.len) {
+                        result.tag = .illegal;
+                    } else {
+                        continue :state .illegal;
+                    },
+                    '\n' => result.tag = .illegal,
+                    else => continue :state .illegal,
+                }
+            },
+            else => continue :state .illegal,
         }
 
         result.loc.end = self.index;
