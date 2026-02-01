@@ -76,13 +76,15 @@ pub const Token = struct {
         r_brace, // '}'
         comma, // ','
         dot, // '.'
+        dot_dot, // '..'
+        colon, // ':'
+        question_mark, // '?'
 
         string_literal, // e.g. "Hello, World"
         multi_string_literal, // e.g. [[Hello, World!]]
         num_literal, // number literal
-        regex_literal, // regex literal (e.g. /^dog/i)
         new_line,
-        comment, // '--' (e.g. '-- This is a comment')
+        comment, // '--' and '--[[...]]'
         illegal,
         eof, // end of file
     };
@@ -119,6 +121,14 @@ pub const Tokenizer = struct {
         dot,
         slash,
         bang,
+        string_literal,
+        string_literal_backslash,
+        multi_string_literal,
+        multi_string_literal_bracket,
+        comment,
+        comment_bracket_open,
+        multi_line_comment,
+        multi_line_comment_bracket_close,
         illegal,
     };
 
@@ -187,8 +197,25 @@ pub const Tokenizer = struct {
                     self.index += 1;
                     result.tag = .comma;
                 },
+                ':' => {
+                    self.index += 1;
+                    result.tag = .colon;
+                },
+                '?' => {
+                    self.index += 1;
+                    result.tag = .question_mark;
+                },
+                '[' => {
+                    if (self.buffer[self.index + 1] == '[') {
+                        continue :state .multi_string_literal;
+                    } else {
+                        continue :state .illegal;
+                    }
+                },
+                ']' => continue :state .illegal,
                 '0' => continue :state .int_zero,
                 '1'...'9' => continue :state .int,
+                '"' => continue :state .string_literal,
                 else => continue :state .illegal,
             },
             .identifier => {
@@ -234,6 +261,7 @@ pub const Tokenizer = struct {
                         self.index += 1;
                         result.tag = .minus_eq;
                     },
+                    '-' => continue :state .comment,
                     else => result.tag = .minus,
                 }
             },
@@ -309,44 +337,174 @@ pub const Tokenizer = struct {
             },
             .dot => {
                 self.index += 1;
-                result.tag = .dot;
+                switch (self.buffer[self.index]) {
+                    '.' => {
+                        self.index += 1;
+                        result.tag = .dot_dot;
+                    },
+                    else => result.tag = .dot,
+                }
             },
             .int => {
                 self.index += 1;
                 switch (self.buffer[self.index]) {
-                    '0'...'9' => continue :state .int,
+                    '0'...'9', '_' => continue :state .int,
+                    '.' => {
+                        if (self.buffer[self.index + 1] == '.') {
+                            result.tag = .num_literal;
+                        } else {
+                            result.tag = .num_literal;
+                        }
+                    },
                     else => result.tag = .num_literal,
                 }
             },
             .int_zero => {
                 self.index += 1;
                 switch (self.buffer[self.index]) {
-                    'x' => continue :state .int_hex,
-                    'b' => continue :state .int_bin,
-                    'c' => continue :state .int_oct,
-                    '0'...'9' => continue :state .int,
+                    'x', 'X' => continue :state .int_hex,
+                    'b', 'B' => continue :state .int_bin,
+                    'o', 'O' => continue :state .int_oct,
+                    '0'...'9', '_' => continue :state .int,
+                    '.' => {
+                        if (self.buffer[self.index + 1] == '.') {
+                            result.tag = .num_literal;
+                        } else {
+                            result.tag = .num_literal;
+                        }
+                    },
                     else => result.tag = .num_literal,
                 }
             },
             .int_hex => {
                 self.index += 1;
                 switch (self.buffer[self.index]) {
-                    '0'...'9', 'a'...'f', 'A'...'F' => continue :state .int_hex,
+                    '0'...'9', 'a'...'f', 'A'...'F', '_' => continue :state .int_hex,
                     else => result.tag = .num_literal,
                 }
             },
             .int_bin => {
                 self.index += 1;
                 switch (self.buffer[self.index]) {
-                    '0', '1' => continue :state .int_bin,
+                    '0', '1', '_' => continue :state .int_bin,
                     else => result.tag = .num_literal,
                 }
             },
             .int_oct => {
                 self.index += 1;
                 switch (self.buffer[self.index]) {
-                    '0'...'7' => continue :state .int_oct,
+                    '0'...'7', '_' => continue :state .int_oct,
                     else => result.tag = .num_literal,
+                }
+            },
+            .string_literal => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    0 => {
+                        if (self.index != self.buffer.len) {
+                            continue :state .illegal;
+                        } else {
+                            result.tag = .illegal;
+                        }
+                    },
+                    '\n' => result.tag = .illegal,
+                    '\\' => continue :state .string_literal_backslash,
+                    '"' => {
+                        self.index += 1;
+                        result.tag = .string_literal;
+                    },
+                    0x01...0x09, 0x0b...0x1f, 0x7f => {
+                        continue :state .illegal;
+                    },
+                    else => continue :state .string_literal,
+                }
+            },
+            .string_literal_backslash => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    0, '\n' => result.tag = .illegal,
+                    else => continue :state .string_literal,
+                }
+            },
+            .multi_string_literal => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    0 => {
+                        if (self.index != self.buffer.len) {
+                            continue :state .illegal;
+                        } else {
+                            result.tag = .illegal;
+                        }
+                    },
+                    '[' => continue :state .multi_string_literal_bracket,
+                    else => {
+                        result.tag = .illegal;
+                    },
+                }
+            },
+            .multi_string_literal_bracket => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    0 => {
+                        if (self.index != self.buffer.len) {
+                            continue :state .illegal;
+                        } else {
+                            result.tag = .illegal;
+                        }
+                    },
+                    ']' => {
+                        self.index += 1;
+                        if (self.buffer[self.index] == ']') {
+                            self.index += 1;
+                            result.tag = .multi_string_literal;
+                        } else {
+                            continue :state .multi_string_literal_bracket;
+                        }
+                    },
+                    else => continue :state .multi_string_literal_bracket,
+                }
+            },
+            .comment => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    0, '\n' => {
+                        result.tag = .comment;
+                    },
+                    '[' => continue :state .comment_bracket_open,
+                    else => continue :state .comment,
+                }
+            },
+            .comment_bracket_open => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    '[' => continue :state .multi_line_comment,
+                    0, '\n' => {
+                        result.tag = .comment;
+                    },
+                    else => continue :state .comment,
+                }
+            },
+            .multi_line_comment => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    0 => {
+                        result.tag = .illegal;
+                    },
+                    ']' => continue :state .multi_line_comment_bracket_close,
+                    else => continue :state .multi_line_comment,
+                }
+            },
+            .multi_line_comment_bracket_close => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    0 => {
+                        result.tag = .illegal;
+                    },
+                    ']' => {
+                        self.index += 1;
+                        result.tag = .comment;
+                    },
+                    else => continue :state .multi_line_comment,
                 }
             },
             .illegal => {
