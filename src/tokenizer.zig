@@ -25,7 +25,9 @@ pub const Token = struct {
         .{ "return", Tag.keyword_return },
         .{ "false", Tag.keyword_false },
         .{ "true", Tag.keyword_true },
-        .{ "null", Tag.keyword_null },
+        .{ "nil", Tag.keyword_nil },
+        .{ "match", Tag.keyword_match },
+        .{ "is", Tag.keyword_is },
     });
 
     pub const Tag = enum(u8) {
@@ -42,7 +44,9 @@ pub const Token = struct {
         keyword_return,
         keyword_false,
         keyword_true,
-        keyword_null,
+        keyword_nil,
+        keyword_match,
+        keyword_is,
 
         eq, // '=' (assignment)
         not_eq, // '!=' (not equal)
@@ -100,16 +104,21 @@ pub const Tokenizer = struct {
         start,
         identifier,
         int,
+        int_zero,
+        int_hex,
+        int_bin,
+        int_oct,
         eq,
+        plus,
+        minus,
         percent,
         asterisk,
-        plus,
         lt,
         gt,
         caret,
         dot,
-        minus,
         slash,
+        bang,
         illegal,
     };
 
@@ -143,41 +152,43 @@ pub const Tokenizer = struct {
                     continue :state .start;
                 },
                 '\n' => {
-                    result.tag = .new_line;
                     self.index += 1;
+                    result.tag = .new_line;
                 },
                 'a'...'z', 'A'...'Z', '_' => continue :state .identifier,
                 '(' => {
-                    result.tag = .l_paren;
                     self.index += 1;
+                    result.tag = .l_paren;
                 },
                 ')' => {
-                    result.tag = .r_paren;
                     self.index += 1;
+                    result.tag = .r_paren;
                 },
                 '{' => {
-                    result.tag = .l_brace;
                     self.index += 1;
+                    result.tag = .l_brace;
                 },
                 '}' => {
-                    result.tag = .r_brace;
                     self.index += 1;
+                    result.tag = .r_brace;
                 },
                 '=' => continue :state .eq,
-                // '%' => continue :state .percent,
-                // '*' => continue :state .asterisk,
-                // '+' => continue :state .plus,
-                // '<' => continue :state .lt,
-                // '>' => continue :state .gt,
-                // '^' => continue :state .caret,
-                // '.' => continue :state .dot,
-                // '-' => continue :state .minus,
-                // '/' => continue :state .slash,
-                // '0'...'9' => {
-                //     result.tag = .number_literal;
-                //     self.index += 1;
-                //     continue :state .int;
-                // },
+                '+' => continue :state .plus,
+                '-' => continue :state .minus,
+                '*' => continue :state .asterisk,
+                '/' => continue :state .slash,
+                '<' => continue :state .lt,
+                '>' => continue :state .gt,
+                '!' => continue :state .bang,
+                '%' => continue :state .percent,
+                '^' => continue :state .caret,
+                '.' => continue :state .dot,
+                ',' => {
+                    self.index += 1;
+                    result.tag = .comma;
+                },
+                '0' => continue :state .int_zero,
+                '1'...'9' => continue :state .int,
                 else => continue :state .illegal,
             },
             .identifier => {
@@ -196,8 +207,8 @@ pub const Tokenizer = struct {
                 self.index += 1;
                 switch (self.buffer[self.index]) {
                     '=' => {
-                        result.tag = .eq_eq;
                         self.index += 1;
+                        result.tag = .eq_eq;
                     },
                     else => result.tag = .eq,
                 }
@@ -206,8 +217,12 @@ pub const Tokenizer = struct {
                 self.index += 1;
                 switch (self.buffer[self.index]) {
                     '=' => {
-                        result.tag = .plus_eq;
                         self.index += 1;
+                        result.tag = .plus_eq;
+                    },
+                    '+' => {
+                        self.index += 1;
+                        result.tag = .plus_plus;
                     },
                     else => result.tag = .plus,
                 }
@@ -216,26 +231,128 @@ pub const Tokenizer = struct {
                 self.index += 1;
                 switch (self.buffer[self.index]) {
                     '=' => {
-                        result.tag = .minus_eq;
                         self.index += 1;
+                        result.tag = .minus_eq;
                     },
                     else => result.tag = .minus,
                 }
             },
-            .illegal => {
+            .asterisk => {
                 self.index += 1;
-
                 switch (self.buffer[self.index]) {
-                    0 => if (self.index == self.buffer.len) {
-                        result.tag = .illegal;
-                    } else {
-                        continue :state .illegal;
+                    '=' => {
+                        self.index += 1;
+                        result.tag = .asterisk_eq;
                     },
-                    '\n' => result.tag = .illegal,
-                    else => continue :state .illegal,
+                    else => result.tag = .asterisk,
                 }
             },
-            else => continue :state .illegal,
+            .slash => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    '=' => {
+                        self.index += 1;
+                        result.tag = .slash_eq;
+                    },
+                    else => result.tag = .slash,
+                }
+            },
+            .percent => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    '=' => {
+                        self.index += 1;
+                        result.tag = .percent_eq;
+                    },
+                    else => result.tag = .percent,
+                }
+            },
+            .caret => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    '=' => {
+                        self.index += 1;
+                        result.tag = .caret_eq;
+                    },
+                    else => result.tag = .caret,
+                }
+            },
+            .lt => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    '=' => {
+                        self.index += 1;
+                        result.tag = .lt_eq;
+                    },
+                    else => result.tag = .lt,
+                }
+            },
+            .gt => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    '=' => {
+                        self.index += 1;
+                        result.tag = .gt_eq;
+                    },
+                    else => result.tag = .gt,
+                }
+            },
+            .bang => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    '=' => {
+                        self.index += 1;
+                        result.tag = .not_eq;
+                    },
+                    else => result.tag = .illegal,
+                }
+            },
+            .dot => {
+                self.index += 1;
+                result.tag = .dot;
+            },
+            .int => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    '0'...'9' => continue :state .int,
+                    else => result.tag = .num_literal,
+                }
+            },
+            .int_zero => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    'x' => continue :state .int_hex,
+                    'b' => continue :state .int_bin,
+                    'c' => continue :state .int_oct,
+                    '0'...'9' => continue :state .int,
+                    else => result.tag = .num_literal,
+                }
+            },
+            .int_hex => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    '0'...'9', 'a'...'f', 'A'...'F' => continue :state .int_hex,
+                    else => result.tag = .num_literal,
+                }
+            },
+            .int_bin => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    '0', '1' => continue :state .int_bin,
+                    else => result.tag = .num_literal,
+                }
+            },
+            .int_oct => {
+                self.index += 1;
+                switch (self.buffer[self.index]) {
+                    '0'...'7' => continue :state .int_oct,
+                    else => result.tag = .num_literal,
+                }
+            },
+            .illegal => {
+                self.index += 1;
+                result.tag = .illegal;
+            },
         }
 
         result.loc.end = self.index;
