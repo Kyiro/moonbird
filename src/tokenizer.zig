@@ -28,6 +28,10 @@ pub const Token = struct {
         .{ "nil", Tag.keyword_nil },
         .{ "match", Tag.keyword_match },
         .{ "is", Tag.keyword_is },
+        .{ "while", Tag.keyword_while },
+        .{ "for", Tag.keyword_for },
+        .{ "in", Tag.keyword_in },
+        .{ "function", Tag.keyword_function },
     });
 
     pub const Tag = enum(u8) {
@@ -47,6 +51,10 @@ pub const Token = struct {
         keyword_nil,
         keyword_match,
         keyword_is,
+        keyword_while,
+        keyword_for,
+        keyword_in,
+        keyword_function,
 
         eq, // '=' (assignment)
         not_eq, // '!=' (not equal)
