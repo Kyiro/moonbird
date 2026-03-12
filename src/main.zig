@@ -24,7 +24,7 @@ pub fn main() void {
         \\local x = nothing or else 10 -- 10
         \\local y =
         \\  if age == 67 then "You're 67 years old."
-        \\  else if age == 69 then "You're 68 years old."
+        \\  else if age == 69 then "You're 69 years old."
         \\  else "I don't care."
         \\
         \\-- pattern matching (inspired by c#)
