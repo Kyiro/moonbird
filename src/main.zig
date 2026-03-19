@@ -1,5 +1,7 @@
 const std = @import("std");
-const Tokenizer = @import("moonbird").Tokenizer;
+const moonbird = @import("moonbird");
+
+const Tokenizer = moonbird.Tokenizer;
 
 pub fn main() void {
     var tokenizer = Tokenizer.init(

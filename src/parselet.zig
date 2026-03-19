@@ -20,7 +20,7 @@ pub const InfixParselet = struct {
 
     pub const VTable = struct {
         parse: *const fn (*const anyopaque, parser: *Parser, left: *Token, token: *Token) void,
-        precedence: *const fn (*const anyopaque) u16,
+        precedence: *const fn (*const anyopaque) u8,
     };
 
     pub fn parse(self: PrefixParselet, parser: *Parser, token: Token) void {
