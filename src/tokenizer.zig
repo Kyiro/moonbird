@@ -98,6 +98,8 @@ pub const Token = struct {
         illegal,
         eof, // end of file
     };
+
+    pub const count = std.meta.fields(Tag).len;
 };
 
 pub const Tokenizer = struct {

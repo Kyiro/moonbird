@@ -1,10 +1,19 @@
 const std = @import("std");
-const moonbird = @import("moonbird");
+const expression = @import("expression.zig");
+const tokenizer_mod = @import("tokenizer.zig");
+const parselets = @import("parselet.zig");
 
-const PrefixParselet = moonbird.PrefixParselet;
-const InfixParselet = moonbird.InfixParselet;
-const Tokenizer = moonbird.Tokenizer;
-const Token = moonbird.Token;
+const PrefixParselet = parselets.PrefixParselet;
+const InfixParselet = parselets.InfixParselet;
+const Tokenizer = tokenizer_mod.Tokenizer;
+const Token = tokenizer_mod.Token;
+const Expression = expression.Expression;
+
+pub const ParserError = error{
+    UnexpectedToken,
+    MissingPrefixParselet,
+    MissingInfixParselet,
+};
 
 pub const Parser = struct {
     allocator: std.mem.Allocator,
@@ -12,14 +21,8 @@ pub const Parser = struct {
     tokenizer: *Tokenizer,
 
     // arrays of the parselets for each token, O(1) lookup time!
-    infix_parselets: [Token.Tag.count]?InfixParselet = .{null} ** Token.Tag.count,
-    prefix_parselets: [Token.Tag.count]?PrefixParselet = .{null} ** Token.Tag.count,
-
-    const ParserError = error{
-        UnexpectedToken,
-        MissingPrefixParselet,
-        MissingInfixParselet,
-    };
+    infix_parselets: [Token.count]?InfixParselet = .{null} ** Token.count,
+    prefix_parselets: [Token.count]?PrefixParselet = .{null} ** Token.count,
 
     pub fn init(allocator: std.mem.Allocator, tokenizer: *Tokenizer) Parser {
         var self = Parser{
@@ -37,17 +40,19 @@ pub const Parser = struct {
         const token = self.current_token;
         self.advance();
 
-        const prefix_parser = try self.prefix_parselets[@intFromEnum(token.tag)] orelse ParserError.MissingPrefixParselet;
-
-        var left = try prefix_parser.parse(self, token);
+        const prefix_opt = self.prefix_parselets[@intFromEnum(token.tag)];
+        var left = if (prefix_opt) |prefix_parser| {
+            try prefix_parser.parse(self, token);
+        } else return error.MissingPrefixParselet;
 
         while (precedence < self.getPrecedence()) {
             const infix_token = self.current_token;
             self.advance();
 
-            const infix_parser = try self.infix_parselets[@intFromEnum(infix_token.tag)] orelse ParserError.MissingInfixParselet;
-
-            left = try infix_parser.parse(self, left, infix_token);
+            const infix_opt = self.infix_parselets[@intFromEnum(infix_token.tag)];
+            if (infix_opt) |infix_parser| {
+                left = try infix_parser.parse(self, left, infix_token);
+            } else return error.MissingInfixParselet;
         }
 
         return left;
